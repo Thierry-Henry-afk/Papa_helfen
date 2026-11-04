@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gefährdungsbeurteilung Baustelle</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF Library for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        safety: {
+                            yellow: '#FFC107',
+                            orange: '#FF9800',
+                            red: '#DC2626',
+                            green: '#16A34A',
+                            dark: '#1E293B',
+                            slate: '#0F172A'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Mobile App Container Simulation */
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Card Swipe Styles */
+        .card-stack {
+            position: relative;
+            width: 100%;
+            height: 420px;
+        }
+
+        .swipe-card {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 1.25rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            cursor: grab;
+            will-change: transform;
+            touch-action: pan-y;
+        }
+
+        .swipe-card.dragging {
+            transition: none;
+            cursor: grabbing;
+        }
+
+        /* Stamp Indicators on Swipe */
+        .badge-stamp {
+            position: absolute;
+            top: 20px;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 1.25rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .badge-yes {
+            right: 20px;
+            border: 3px solid #DC2626;
+            color: #DC2626;
+            transform: rotate(12deg);
+        }
+
+        .badge-no {
+            left: 20px;
+            border: 3px solid #16A34A;
+            color: #16A34A;
+            transform: rotate(-12deg);
+        }
+
+        /* Custom Scrollbar for App Feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-center items-center p-0 sm:p-4 bg-slate-900 text-slate-800">
+
+    <!-- Main Mobile Container -->
+    <div class="w-full max-w-md h-full sm:h-[880px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border-0 sm:border-4 border-slate-800">
+        
+        <!-- App Header -->
+        <header class="bg-safety-dark text-white px-5 py-4 flex justify-between items-center shrink-0 border-b-4 border-amber-500 shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-500 text-slate-900 p-2 rounded-xl flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-hard-hat text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide">BauSchutz Pro</h1>
+                    <p class="text-xs text-amber-400 font-medium">Gefährdungsbeurteilung BGHM</p>
+                </div>
+            </div>
+            <span id="step-indicator" class="text-xs font-semibold bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-slate-300">
+                1 / 4
+            </span>
+        </header>
+
+        <!-- Dynamic Content Body -->
+        <main id="app-body" class="flex-1 overflow-y-auto p-4 bg-slate-50 relative flex flex-col">
+            <!-- Content will be dynamically rendered here via JS -->
+        </main>
+
+        <!-- Footer Navigation / Controls -->
+        <footer id="app-footer" class="bg-white border-t border-slate-200 px-4 py-3 shrink-0 flex justify-between items-center shadow-lg">
+            <!-- Dynamic footer buttons will be injected here -->
+        </footer>
+    </div>
+
+    <!-- Info Modal / Popup -->
+    <div id="info-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div class="flex items-center gap-3 text-amber-600 mb-3">
+                <i class="fa-solid fa-circle-info text-2xl"></i>
+                <h3 id="modal-title" class="font-bold text-lg text-slate-900">Information</h3>
+            </div>
+            <div id="modal-content" class="text-sm text-slate-600 space-y-2 mb-6">
+                <!-- Info content injected here -->
+            </div>
+            <button onclick="closeInfoModal()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 active:scale-95 transition-all text-sm">
+                Verstanden
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // BGHM Classification Database with specific placeholders
+        const bghmCategories = [
+            {
+                id: 1,
+                title: "1. Mechanische Gefährdungen",
+                icon: "fa-gears",
+                bgGradient: "from-amber-500 to-orange-600",
+                placeholder: "z. B. Quetschen an einer beweglichen Maschine in Halle 2",
+                description: "Ungeschützte Maschinenteile, Ausrutschen, Stolpern, Absturz, transportierte Lasten.",
+                examples: [
+                    "1.1 Ungeschützt bewegte Maschinenteile (Sägeblätter, Antriebe)",
+                    "1.2 Teile mit gefährlichen Oberflächen (scharfkantig, rauh)",
+                    "1.3 Bewegte Transportmittel / Baustellenfahrzeuge",
+                    "1.4 Unkontrolliert bewegte Teile (herabfallende Gegenstände)",
+                    "1.5 Sturz, Ausrutschen, Stolpern, Umknicken (Kabel, Bauschutt)",
+                    "1.6 Absturzgefahren (Gerüste, Dachkanten, Bodenöffnungen)"
+                ]
+            },
+            {
+                id: 2,
+                title: "2. Elektrische Gefährdungen",
+                icon: "fa-bolt",
+                bgGradient: "from-amber-400 to-yellow-600",
+                placeholder: "z. B. Freiliegendes Kabel an der Verteilerbox Baustelle OG",
+                description: "Gefahren durch elektrischen Strom, Lichtbögen und beschädigte Leitungen.",
+                examples: [
+                    "2.1 Elektrischer Schlag (beschädigte Kabel, Baustromverteiler)",
+                    "2.2 Lichtbögen bei Schaltvorgängen oder Kurzschlüssen",
+                    "2.3 Elektrostatische Aufladungen"
+                ]
+            },
+            {
+                id: 3,
+                title: "3. Gefahrstoffe",
+                icon: "fa-flask",
+                bgGradient: "from-emerald-500 to-teal-700",
+                placeholder: "z. B. Unbeschriftetes Lösemittelgebinde am Reinigungsplatz",
+                description: "Chemische Stoffe, Stäube, Gase, Dämpfe und Reinigungsmittel.",
+                examples: [
+                    "3.1 Hautkontakt mit Gefahrstoffen (Zement, Klebstoffe, Harze)",
+                    "3.2 Einatmen von Stäuben/Gasen (Quarzstaub, Schweißrauch, Lösemittel)",
+                    "3.3 Verschlucken von Gefahrstoffen (mangelnde Hygiene)",
+                    "3.4 Physikalisch-chemische Gefahren (Brand/Explosion durch Gefahrstoffe)"
+                ]
+            },
+            {
+                id: 4,
+                title: "4. Biologische Arbeitsstoffe",
+                icon: "fa-microscope",
+                bgGradient: "from-lime-600 to-green-700",
+                placeholder: "z. B. Schimmelpilzbefall bei Sanierung im Graben/Keller",
+                description: "Mikroorganismen, Schimmel, Abwasser oder Infektionsgefahren.",
+                examples: [
+                    "4.1 Infektionsgefährdung durch Mikroorganismen (Bakterien, Viren)",
+                    "4.2 Sensibilisierende / toxische Wirkungen (Schimmelpilzsporen bei Sanierung)"
+                ]
+            },
+            {
+                id: 5,
+                title: "5. Brand- & Explosionsgefahren",
+                icon: "fa-fire",
+                bgGradient: "from-red-500 to-amber-600",
+                placeholder: "z. B. Unsachgemäß gelagerte Gasflaschen im Werkstattbereich",
+                description: "Brennbare Materialien, Gasflaschen, Schweißarbeiten, explosive Gasgemische.",
+                examples: [
+                    "5.1 Brennbare Feststoffe, Flüssigkeiten oder Gase (Gasflaschen)",
+                    "5.2 Explosionsfähige Atmosphäre (Staub-/Lösungsmittel-Luft-Gemische)",
+                    "5.3 Explosivstoffe (Sprengmittel)"
+                ]
+            },
+            {
+                id: 6,
+                title: "6. Thermische Gefährdungen",
+                icon: "fa-temperature-high",
+                bgGradient: "from-orange-500 to-red-600",
+                placeholder: "z. B. Unisolierte heiße Dampfleitung im Bedadachungsbereich",
+                description: "Berührung extremer Hitze oder Kälte.",
+                examples: [
+                    "6.1 Heiße Medien / Oberflächen (Bitumenarbeiten, Schweißen)",
+                    "6.2 Kalte Medien / Oberflächen (Arbeiten im Kühlhaus, Kältemittel)"
+                ]
+            },
+            {
+                id: 7,
+                title: "7. Spezielle physikalische Einwirkungen",
+                icon: "fa-ear-deaf",
+                bgGradient: "from-blue-600 to-indigo-700",
+                placeholder: "z. B. Hohe Lärmbelastung durch Abbrucharbeiten ohne Schutz",
+                description: "Lärm, Erschütterungen, Strahlung oder Luftdruck.",
+                examples: [
+                    "7.1 Lärm (Meißelarbeiten, Sägen, schwere Baumaschinen)",
+                    "7.3/7.4 Vibrationen (Ganzkörper- oder Hand-Arm-Vibrationen durch Abbruchhammer)",
+                    "7.5 Nicht ionisierende Strahlung (UV-Strahlung durch Sonne / Schweißen)",
+                    "7.6 Ionisierende Strahlung (Röntgeneinrichtungen)"
+                ]
+            },
+            {
+                id: 8,
+                title: "8. Arbeitsumgebungsbedingungen",
+                icon: "fa-building-shield",
+                bgGradient: "from-sky-500 to-blue-700",
+                placeholder: "z. B. Verstellter Fluchtweg durch Baumaterial im Treppenhaus",
+                description: "Wetter, Beleuchtung, unzureichende Fluchtwege oder Platzmangel.",
+                examples: [
+                    "8.1 Klima (Extreme Hitze, Kälte, fehlende Belüftung)",
+                    "8.2 Unzureichende Beleuchtung / Blendung",
+                    "8.3 Ersticken / Ertrinken (Gruben, Silos, Schächte)",
+                    "8.4 Mangelhafte Flucht-/Verkehrswege oder fehlende Beschilderung",
+                    "8.5 Ungünstige Ergonomie / Räumliche Enge"
+                ]
+            },
+            {
+                id: 9,
+                title: "9. Physische Belastung / Arbeitsschwere",
+                icon: "fa-person-digging",
+                bgGradient: "from-violet-600 to-purple-800",
+                placeholder: "z. B. Heben schwerer Zementsäcke ohne Hebehilfe",
+                description: "Heben schwerer Lasten, Zwangshaltungen, repetitive Bewegungen.",
+                examples: [
+                    "9.1 Schwere dynamische Arbeit (Manuelles Tragen von Säcken, Steinen)",
+                    "9.2 Häufig wiederholte Bewegungen (Montagearbeiten)",
+                    "9.3 Zwangshaltungen (Überkopf-Arbeiten, Knien, Haltearbeit)"
+                ]
+            },
+            {
+                id: 10,
+                title: "10. Psychische Faktoren",
+                icon: "fa-brain",
+                bgGradient: "from-pink-500 to-rose-700",
+                placeholder: "z. B. Erheblicher Zeitdruck durch vorgezogene Fertigstellung",
+                description: "Hoher Zeitdruck, Schichtarbeit, schlechte Kommunikation.",
+                examples: [
+                    "10.1 Ungenügend gestaltete Aufgaben (Monotonie, Über-/Unterforderung)",
+                    "10.2 Hoher Zeit- und Termindruck, lange Arbeitszeiten",
+                    "10.3 Soziale Konflikte / Mangelnde Einarbeitung"
+                ]
+            },
+            {
+                id: 11,
+                title: "11. Sonstige Gefährdungen",
+                icon: "fa-triangle-exclamation",
+                bgGradient: "from-slate-600 to-slate-800",
+                placeholder: "z. B. Unbefugte Personen / Publikumsverkehr im Schwenkbereich",
+                description: "Gefahren durch Dritte, Tiere oder pflanzliche Stoffe.",
+                examples: [
+                    "11.1 Gefährdung durch Dritte / Passanten / Überfall",
+                    "11.2 Tiere (Insektenstiche, Bisse bei Freilandarbeit)",
+                    "11.3 Pflanzen (Giftpflanzen, Allergene)"
+                ]
+            }
+        ];
+
+        // Tailored TOP Measures Database Generator
+        const topDatabase = {
+            1: {
+                T: "Schutzabdeckung / Verkleidung anbringen & Sicherungsnetze montieren.",
+                O: "Gefahrenbereich absperren, Sicherheitsunterweisung durchführen.",
+                P: "Sicherheitsschuhe (S3), Schutzhelm und Anseilschutz (PSAgA) tragen."
+            },
+            2: {
+                T: "Defekte Kabel/Geräte sofort austauschen, RCD/FI-Schutzschalter vorschalten.",
+                O: "Verteilerkasten verschließen, DGUV V3 Prüffristen einhalten.",
+                P: "Isolierende Schutzhandschuhe & Spannungsprüfer verwenden."
+            },
+            3: {
+                T: "Absauganlage einschalten oder staubarme Verfahren nutzen.",
+                O: "Sicherheitsdatenblätter bereitstellen & Gebinde ordnungsgemäß beschriften.",
+                P: "Atemschutz (FFP2/FFP3) und chemikalienbeständige Schutzhandschuhe tragen."
+            },
+            4: {
+                T: "Technische Lüftung einsetzen & Oberflächen desinfizieren/reinigen.",
+                O: "Hygienepfad einrichten, Hautschutzplan erstellen.",
+                P: "Schutzanzug, Atemschutz und Schutzbrille tragen."
+            },
+            5: {
+                T: "Feuerlöscher bereitstellen, Zündquellen entfernen.",
+                O: "Erteilung von Erlaubnisscheinen für Heißarbeiten, Rauchverbot durchsetzen.",
+                P: "Schwer entflammbare Schutzkleidung tragen."
+            },
+            6: {
+                T: "Isolierung an heißer Leitung anbringen oder Kälteschutzschild installieren.",
+                O: "Aufenthaltszeiten im extremen Temperaturbereich begrenzen.",
+                P: "Hitzeschutz- bzw. Kälteschutzhandschuhe tragen."
+            },
+            7: {
+                T: "Lärmarme Maschinen einsetzen oder Schalldämmung nachrüsten.",
+                O: "Lärmbereiche kennzeichnen, Rotationsprinzip für Mitarbeiter nutzen.",
+                P: "Kapselgehörschutz / Gehörstöpsel konsequent tragen."
+            },
+            8: {
+                T: "Zusätzliche Baustellenbeleuchtung aufstellen & Fluchtwege freiräumen.",
+                O: "Regelmäßige Kontrolle der Verkehrswege & Ausleuchtung durchführen.",
+                P: "Warnweste mit Reflektoren tragen."
+            },
+            9: {
+                T: "Einsatz von Hebehilfen, Kranen oder Minibaggern.",
+                O: "Pausenregelung anpassen, Lastenaufteilung auf mehrere Arbeiter.",
+                P: "Ergonomische Arbeitsweise anwenden, Rückenschulung."
+            },
+            10: {
+                T: "Optimierung von Werkzeugen und Materialbereitstellung.",
+                O: "Realistische Termine planen, Aufgabenklarheit schaffen.",
+                P: "Schulung zu Stressmanagement & offener Kommunikation."
+            },
+            11: {
+                T: "Baustellenaunzaunung & Zugangskontrollen errichten.",
+                O: "Warnschilder anbringen, Sicherheitsdienst einbinden.",
+                P: "Persönliche Deeskalation und Erste-Hilfe-Ausrüstung bereithalten."
+            },
+            DEFAULT: {
+                T: "Mangelhafte Ausrüstung reparieren oder austauschen.",
+                O: "Mitarbeiter unterweisen & Gefahrenbereich abgrenzen.",
+                P: "Geeignete persönliche Schutzausrüstung (PSA) tragen."
+            }
+        };
+
+        // App State
+        let appState = {
+            currentStep: 1,
+            metadata: {
+                companyName: "Arbeitsschutz Wolf",
+                siteName: "",
+                inspector: "",
+                date: new Date().toISOString().split('T')[0],
+                logo: null,
+                logoDimensions: null,
+                signature: null
+            },
+            swipeIndex: 0,
+            assessments: {}
+        };
+
+        // Helper date calculator
+        function getCalculatedDate(option, customDate = null) {
+            const today = new Date();
+            if (option === 'ERLEDIGT') {
+                return `Erledigt am ${today.toLocaleDateString('de-DE')}`;
+            } else if (option === 'IN_ARBEIT') {
+                const target = new Date();
+                target.setDate(today.getDate() + 7);
+                return `In Arbeit (Ziel: ${target.toLocaleDateString('de-DE')})`;
+            } else if (option === 'IN_PROZESS') {
+                if (customDate) {
+                    const cDate = new Date(customDate);
+                    return `In Prozess (Ziel: ${cDate.toLocaleDateString('de-DE')})`;
+                }
+                const target = new Date();
+                target.setMonth(today.getMonth() + 1);
+                return `In Prozess (Ziel: ${target.toLocaleDateString('de-DE')})`;
+            }
+            return '';
+        }
+
+        window.onload = function() {
+            renderApp();
+        };
+
+        function renderApp() {
+            const body = document.getElementById('app-body');
+            const footer = document.getElementById('app-footer');
+            const stepInd = document.getElementById('step-indicator');
+
+            stepInd.innerText = `${appState.currentStep} / 4`;
+
+            switch(appState.currentStep) {
+                case 1:
+                    renderStepStammdaten(body, footer);
+                    break;
+                case 2:
+                    renderStepSwipe(body, footer);
+                    break;
+                case 3:
+                    renderStepDetails(body, footer);
+                    break;
+                case 4:
+                    renderStepSummary(body, footer);
+                    break;
+            }
+        }
+
+        function renderStepStammdaten(body, footer) {
+            body.innerHTML = `
+                <div class="flex-1 flex flex-col justify-between py-2">
+                    <div class="space-y-4">
+                        <div class="text-center my-2">
+                            <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-inner">
+                                <i class="fa-solid fa-clipboard-user text-2xl"></i>
+                            </div>
+                            <h2 class="text-lg font-bold text-slate-800">Baustellen-Stammdaten</h2>
+                            <p class="text-xs text-slate-500">Erfassen Sie die Basisdaten für das Prüfprotokoll</p>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Firmenname / Betrieb</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                        <i class="fa-solid fa-briefcase"></i>
+                                    </span>
+                                    <input type="text" id="input-company" value="${appState.metadata.companyName}" placeholder="z. B. Arbeitsschutz Wolf GmbH" 
+                                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-2">Firmenlogo (für PDF Header)</label>
+                                <div class="flex items-center gap-3">
+                                    <div id="logo-preview-box" class="w-20 h-14 bg-slate-100 border border-dashed border-slate-300 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                                        ${appState.metadata.logo ? `<img src="${appState.metadata.logo}" class="max-h-full max-w-full object-contain">` : `<i class="fa-solid fa-image text-slate-400 text-xl"></i>`}
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-2 rounded-xl inline-flex items-center gap-2 border border-slate-700 transition-all">
+                                            <i class="fa-solid fa-upload text-amber-400"></i>
+                                            <span>${appState.metadata.logo ? 'Logo ändern' : 'Logo hochladen'}</span>
+                                            <input type="file" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                                        </label>
+                                        <p class="text-[10px] text-slate-400 mt-1">Wird oben rechts im PDF platziert</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Baustelle / Objekt</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                        <i class="fa-solid fa-building"></i>
+                                    </span>
+                                    <input type="text" id="input-site" value="${appState.metadata.siteName}" placeholder="z.B. Neubau Wohnpark - Halle B" 
+                                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Prüfer / Verantwortlicher</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                        <i class="fa-solid fa-user-shield"></i>
+                                    </span>
+                                    <input type="text" id="input-inspector" value="${appState.metadata.inspector}" placeholder="z.B. Max Mustermann (SiGeKo)" 
+                                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Prüfdatum</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                        <i class="fa-solid fa-calendar-days"></i>
+                                    </span>
+                                    <input type="date" id="input-date" value="${appState.metadata.date}" 
+                                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            footer.innerHTML = `
+                <div></div>
+                <button onclick="saveStep1AndNext()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                    <span>Erfassung starten</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            `;
+        }
+
+        function saveStep1AndNext() {
+            const companyInput = document.getElementById('input-company');
+            const siteInput = document.getElementById('input-site');
+            const inspectorInput = document.getElementById('input-inspector');
+            const dateInput = document.getElementById('input-date');
+
+            if (companyInput) appState.metadata.companyName = companyInput.value;
+            if (siteInput) appState.metadata.siteName = siteInput.value;
+            if (inspectorInput) appState.metadata.inspector = inspectorInput.value;
+            if (dateInput) appState.metadata.date = dateInput.value;
+
+            appState.currentStep = 2;
+            renderApp();
+        }
+
+        function updateItemField(catId, itemId, field, value) {
+            const item = appState.assessments[catId]?.items.find(i => i.id === itemId);
+            if (item) {
+                item[field] = value;
+            }
+        }
+
+        function handleLogoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imgData = e.target.result;
+                const img = new Image();
+                img.onload = function() {
+                    appState.metadata.logo = imgData;
+                    appState.metadata.logoDimensions = {
+                        width: img.width,
+                        height: img.height
+                    };
+                    renderApp();
+                };
+                img.src = imgData;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderStepSwipe(body, footer) {
+            if (appState.swipeIndex >= bghmCategories.length) {
+                appState.currentStep = 3;
+                renderApp();
+                return;
+            }
+
+            const currentCat = bghmCategories[appState.swipeIndex];
+            const progressPct = Math.round(((appState.swipeIndex) / bghmCategories.length) * 100);
+
+            body.innerHTML = `
+                <div class="flex-1 flex flex-col justify-between">
+                    <div class="mb-3">
+                        <div class="flex justify-between text-xs font-semibold text-slate-500 mb-1">
+                            <span>Kategorie ${appState.swipeIndex + 1} von ${bghmCategories.length}</span>
+                            <span>${progressPct}% erledigt</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div class="bg-amber-500 h-full transition-all duration-300" style="width: ${progressPct}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="card-stack my-auto">
+                        <div id="active-swipe-card" class="swipe-card bg-gradient-to-br ${currentCat.bgGradient} text-white p-6 flex flex-col justify-between">
+                            <div class="badge-stamp badge-yes">VORHANDEN</div>
+                            <div class="badge-stamp badge-no">OK / NEIN</div>
+
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white text-2xl shadow-md border border-white/30">
+                                        <i class="fa-solid ${currentCat.icon}"></i>
+                                    </div>
+                                    <button onclick="openCategoryInfo(${currentCat.id})" class="bg-white/20 hover:bg-white/30 text-white p-2.5 rounded-xl backdrop-blur-md transition-all border border-white/30 active:scale-95">
+                                        <i class="fa-solid fa-circle-info text-xl"></i>
+                                    </button>
+                                </div>
+                                <h3 class="text-xl font-bold leading-tight mb-2">${currentCat.title}</h3>
+                                <p class="text-xs text-white/90 leading-relaxed font-normal">${currentCat.description}</p>
+                            </div>
+
+                            <div class="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20 my-auto">
+                                <span class="text-[10px] font-bold tracking-wider text-amber-200 uppercase block mb-1">Beispiel / Orientierung:</span>
+                                <p class="text-xs italic text-white/95">${currentCat.placeholder}</p>
+                            </div>
+
+                            <div class="text-center text-xs text-white/70 font-medium">
+                                <i class="fa-solid fa-arrows-left-right mr-1"></i> Nach links = OK | Nach rechts = Gefährdung
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            footer.innerHTML = `
+                <button onclick="swipeDecision(false)" class="flex-1 mr-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all text-sm">
+                    <i class="fa-solid fa-check text-lg"></i>
+                    <span>Nein / OK</span>
+                </button>
+                <button onclick="swipeDecision(true)" class="flex-1 ml-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all text-sm">
+                    <span>Ja (Gefahr!)</span>
+                    <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                </button>
+            `;
+
+            setTimeout(initSwipeGestures, 50);
+        }
+
+        function swipeDecision(hasDanger) {
+            const currentCat = bghmCategories[appState.swipeIndex];
+
+            if (!appState.assessments[currentCat.id]) {
+                appState.assessments[currentCat.id] = {
+                    present: hasDanger,
+                    items: hasDanger ? [{
+                        id: Date.now(),
+                        description: "",
+                        riskLevel: "GELB",
+                        priority: "MITTEL",
+                        statusOption: "OFFEN",
+                        statusCustomDate: "",
+                        responsible: "",
+                        topT_soll: topDatabase[currentCat.id]?.T || topDatabase.DEFAULT.T,
+                        topT_ist: "",
+                        topO_soll: topDatabase[currentCat.id]?.O || topDatabase.DEFAULT.O,
+                        topO_ist: "",
+                        topP_soll: topDatabase[currentCat.id]?.P || topDatabase.DEFAULT.P,
+                        topP_ist: "",
+                        photo: null
+                    }] : []
+                };
+            } else {
+                appState.assessments[currentCat.id].present = hasDanger;
+                if (hasDanger && appState.assessments[currentCat.id].items.length === 0) {
+                    addHazardItem(currentCat.id);
+                }
+            }
+
+            appState.swipeIndex++;
+            renderApp();
+        }
+
+        function initSwipeGestures() {
+            const card = document.getElementById('active-swipe-card');
+            if (!card) return;
+
+            let startX = 0, currentX = 0, isDragging = false;
+            const yesBadge = card.querySelector('.badge-yes');
+            const noBadge = card.querySelector('.badge-no');
+
+            const startDrag = (e) => {
+                isDragging = true;
+                startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                card.classList.add('dragging');
+            };
+
+            const moveDrag = (e) => {
+                if (!isDragging) return;
+                currentX = (e.type.includes('touch') ? e.touches[0].clientX : e.clientX) - startX;
+                card.style.transform = `translateX(${currentX}px) rotate(${currentX * 0.05}deg)`;
+
+                if (currentX > 30) {
+                    yesBadge.style.opacity = Math.min(currentX / 100, 1);
+                    noBadge.style.opacity = 0;
+                } else if (currentX < -30) {
+                    noBadge.style.opacity = Math.min(-currentX / 100, 1);
+                    yesBadge.style.opacity = 0;
+                } else {
+                    yesBadge.style.opacity = 0;
+                    noBadge.style.opacity = 0;
+                }
+            };
+
+            const endDrag = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                card.classList.remove('dragging');
+
+                if (currentX > 100) {
+                    swipeDecision(true);
+                } else if (currentX < -100) {
+                    swipeDecision(false);
+                } else {
+                    card.style.transform = 'none';
+                    if (yesBadge) yesBadge.style.opacity = 0;
+                    if (noBadge) noBadge.style.opacity = 0;
+                }
+            };
+
+            card.addEventListener('mousedown', startDrag);
+            window.addEventListener('mousemove', moveDrag);
+            window.addEventListener('mouseup', endDrag);
+
+            card.addEventListener('touchstart', startDrag);
+            window.addEventListener('touchmove', moveDrag);
+            window.addEventListener('touchend', endDrag);
+        }
+
+        function openCategoryInfo(catId) {
+            const cat = bghmCategories.find(c => c.id === catId);
+            if (!cat) return;
+
+            document.getElementById('modal-title').innerText = cat.title;
+            const listHtml = cat.examples.map(ex => `<li class="flex items-start gap-2"><i class="fa-solid fa-angle-right text-amber-500 mt-1"></i><span>${ex}</span></li>`).join('');
+            document.getElementById('modal-content').innerHTML = `
+                <p class="font-semibold text-slate-800">${cat.description}</p>
+                <p class="text-xs text-slate-500 font-bold uppercase mt-3 mb-1">Typische Gefährdungen nach BGHM:</p>
+                <ul class="space-y-1.5 text-xs text-slate-600">${listHtml}</ul>
+            `;
+            document.getElementById('info-modal').classList.remove('hidden');
+        }
+
+        function closeInfoModal() {
+            document.getElementById('info-modal').classList.add('hidden');
+        }
+
+        function renderStepDetails(body, footer) {
+            const categoriesWithHazards = bghmCategories.filter(cat => appState.assessments[cat.id]?.present);
+
+            if (categoriesWithHazards.length === 0) {
+                body.innerHTML = `
+                    <div class="flex-1 flex flex-col justify-center items-center text-center p-6">
+                        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-shield-check text-3xl"></i>
+                        </div>
+                        <h3 class="font-bold text-lg text-slate-800">Keine Gefährdungen erfasst</h3>
+                        <p class="text-xs text-slate-500 max-w-xs mt-1 mb-6">Sie haben bei allen Kategorien angegeben, dass keine Gefährdungen vorliegen.</p>
+                        <button onclick="appState.currentStep = 4; renderApp();" class="bg-slate-900 text-white font-bold py-3 px-6 rounded-xl text-xs">
+                            Weiter zum Prüfprotokoll
+                        </button>
+                    </div>
+                `;
+                footer.innerHTML = `<div></div><div></div>`;
+                return;
+            }
+
+            let cardsHtml = categoriesWithHazards.map(cat => {
+                const assessment = appState.assessments[cat.id];
+                const itemsHtml = assessment.items.map((item, idx) => `
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3 relative mb-3">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <span class="text-xs font-bold text-amber-600">Mangel #${idx + 1}</span>
+                            ${assessment.items.length > 1 ? `
+                                <button onclick="removeHazardItem(${cat.id}, ${item.id})" class="text-red-500 hover:text-red-700 text-xs font-semibold flex items-center gap-1">
+                                    <i class="fa-solid fa-trash-can"></i> Entfernen
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Konkreter Befund / Ort</label>
+                            <input type="text" value="${item.description}" onchange="updateItemField(${cat.id}, ${item.id}, 'description', this.value)" 
+                                placeholder="${cat.placeholder}" 
+                                class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Risikostufe</label>
+                                <select onchange="updateItemField(${cat.id}, ${item.id}, 'riskLevel', this.value)" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold">
+                                    <option value="ROT" ${item.riskLevel === 'ROT' ? 'selected' : ''}>🔴 ROT (Arbeitsstopp)</option>
+                                    <option value="GELB" ${item.riskLevel === 'GELB' ? 'selected' : ''}>🟡 GELB (Achtung)</option>
+                                    <option value="GRÜN" ${item.riskLevel === 'GRÜN' ? 'selected' : ''}>🟢 GRÜN (OK)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status / Abwicklungsfrist</label>
+                                <select onchange="handleStatusChange(${cat.id}, ${item.id}, this.value)" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold">
+                                    <option value="OFFEN" ${item.statusOption === 'OFFEN' ? 'selected' : ''}>Offen (Manuell)</option>
+                                    <option value="ERLEDIGT" ${item.statusOption === 'ERLEDIGT' ? 'selected' : ''}>🟢 Erledigt (Heute)</option>
+                                    <option value="IN_ARBEIT" ${item.statusOption === 'IN_ARBEIT' ? 'selected' : ''}>🟡 In Arbeit (+1 Woche)</option>
+                                    <option value="IN_PROZESS" ${item.statusOption === 'IN_PROZESS' ? 'selected' : ''}>🔵 In Prozess (+1 Monat / Datum)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        ${item.statusOption === 'IN_PROZESS' ? `
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Ziel-Datum für Prozess</label>
+                                <input type="date" value="${item.statusCustomDate || ''}" onchange="handleCustomDateChange(${cat.id}, ${item.id}, this.value)" class="w-full p-2 bg-blue-50 border border-blue-300 rounded-lg text-xs font-semibold">
+                            </div>
+                        ` : ''}
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Priorität</label>
+                                <select onchange="updateItemField(${cat.id}, ${item.id}, 'priority', this.value)" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold">
+                                    <option value="HOCH" ${item.priority === 'HOCH' ? 'selected' : ''}>Sofort (1 Tag)</option>
+                                    <option value="MITTEL" ${item.priority === 'MITTEL' ? 'selected' : ''}>Mittel (1 Woche)</option>
+                                    <option value="NIEDRIG" ${item.priority === 'NIEDRIG' ? 'selected' : ''}>Niedrig (30 Tage)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Verantwortlich / Gewerk</label>
+                                <input type="text" value="${item.responsible}" onchange="updateItemField(${cat.id}, ${item.id}, 'responsible', this.value)" 
+                                    placeholder="z. B. Bauleiter / Elektriker" 
+                                    class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium">
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2 border-t border-slate-100">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[11px] font-bold text-slate-800 uppercase">T-O-P Maßnahmen</span>
+                                <button onclick="loadDefaultTOP(${cat.id}, ${item.id})" class="text-[10px] text-amber-600 font-bold hover:underline">
+                                    <i class="fa-solid fa-rotate mr-1"></i>Standard-TOP
+                                </button>
+                            </div>
+
+                            <div class="space-y-1.5 text-xs">
+                                <div>
+                                    <span class="font-bold text-slate-700">T (Technisch - Soll):</span>
+                                    <input type="text" value="${item.topT_soll}" onchange="updateItemField(${cat.id}, ${item.id}, 'topT_soll', this.value)" class="w-full p-1.5 bg-slate-50 border rounded text-xs">
+                                    <input type="text" value="${item.topT_ist}" onchange="updateItemField(${cat.id}, ${item.id}, 'topT_ist', this.value)" placeholder="Status / Ist-Durchführung" class="w-full p-1.5 bg-amber-50/50 border border-amber-200 rounded text-xs mt-1 italic">
+                                </div>
+                                <div>
+                                    <span class="font-bold text-slate-700">O (Organisatorisch - Soll):</span>
+                                    <input type="text" value="${item.topO_soll}" onchange="updateItemField(${cat.id}, ${item.id}, 'topO_soll', this.value)" class="w-full p-1.5 bg-slate-50 border rounded text-xs">
+                                    <input type="text" value="${item.topO_ist}" onchange="updateItemField(${cat.id}, ${item.id}, 'topO_ist', this.value)" placeholder="Status / Ist-Durchführung" class="w-full p-1.5 bg-amber-50/50 border border-amber-200 rounded text-xs mt-1 italic">
+                                </div>
+                                <div>
+                                    <span class="font-bold text-slate-700">P (Personell - Soll):</span>
+                                    <input type="text" value="${item.topP_soll}" onchange="updateItemField(${cat.id}, ${item.id}, 'topP_soll', this.value)" class="w-full p-1.5 bg-slate-50 border rounded text-xs">
+                                    <input type="text" value="${item.topP_ist}" onchange="updateItemField(${cat.id}, ${item.id}, 'topP_ist', this.value)" placeholder="Status / Ist-Durchführung" class="w-full p-1.5 bg-amber-50/50 border border-amber-200 rounded text-xs mt-1 italic">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100">
+                            <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Fotodokumentation</label>
+                            <div class="flex items-center gap-2">
+                                <label class="cursor-pointer bg-slate-800 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                    <i class="fa-solid fa-camera text-amber-400"></i> Kamera
+                                    <input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleItemPhoto(${cat.id}, ${item.id}, event)">
+                                </label>
+                                <label class="cursor-pointer bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                    <i class="fa-solid fa-folder-open"></i> Datei
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleItemPhoto(${cat.id}, ${item.id}, event)">
+                                </label>
+                                ${item.photo ? `<span class="text-xs text-emerald-600 font-bold ml-auto flex items-center gap-1"><i class="fa-solid fa-check"></i> Foto vorhanden</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="bg-slate-100 p-3 rounded-2xl border border-slate-300 mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-slate-800 text-xs uppercase">${cat.title}</h4>
+                            <button onclick="addHazardItem(${cat.id})" class="text-[11px] bg-amber-500 text-slate-900 font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                                <i class="fa-solid fa-plus"></i> Weitere Gefährdung
+                            </button>
+                        </div>
+                        ${itemsHtml}
+                    </div>
+                `;
+            }).join('');
+
+            body.innerHTML = `
+                <div class="space-y-3">
+                    <div class="text-center mb-2">
+                        <h2 class="text-base font-bold text-slate-800">Bewertung & T-O-P Maßnahmen</h2>
+                        <p class="text-xs text-slate-500">Ergänzen Sie Details und Maßnahmen zu den gefundenen Mängeln</p>
+                    </div>
+                    ${cardsHtml}
+                </div>
+            `;
+
+            footer.innerHTML = `
+                <button onclick="appState.currentStep = 2; renderApp();" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 px-4 rounded-xl text-xs">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Zurück
+                </button>
+                <button onclick="appState.currentStep = 4; renderApp();" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-6 rounded-xl text-xs flex items-center gap-2">
+                    <span>Zum Protokoll</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            `;
+        }
+
+        function handleStatusChange(catId, itemId, option) {
+            const item = appState.assessments[catId]?.items.find(i => i.id === itemId);
+            if (item) {
+                item.statusOption = option;
+                if (option !== 'OFFEN') {
+                    const statusText = getCalculatedDate(option, item.statusCustomDate);
+                    item.topT_ist = statusText;
+                    item.topO_ist = statusText;
+                    item.topP_ist = statusText;
+                }
+                renderApp();
+            }
+        }
+
+        function handleCustomDateChange(catId, itemId, customDate) {
+            const item = appState.assessments[catId]?.items.find(i => i.id === itemId);
+            if (item) {
+                item.statusCustomDate = customDate;
+                const statusText = getCalculatedDate('IN_PROZESS', customDate);
+                item.topT_ist = statusText;
+                item.topO_ist = statusText;
+                item.topP_ist = statusText;
+                renderApp();
+            }
+        }
+
+        function addHazardItem(catId) {
+            const cat = bghmCategories.find(c => c.id === catId);
+            if (!appState.assessments[catId]) {
+                appState.assessments[catId] = { present: true, items: [] };
+            }
+            appState.assessments[catId].items.push({
+                id: Date.now(),
+                description: "",
+                riskLevel: "GELB",
+                priority: "MITTEL",
+                statusOption: "OFFEN",
+                statusCustomDate: "",
+                responsible: "",
+                topT_soll: topDatabase[catId]?.T || topDatabase.DEFAULT.T,
+                topT_ist: "",
+                topO_soll: topDatabase[catId]?.O || topDatabase.DEFAULT.O,
+                topO_ist: "",
+                topP_soll: topDatabase[catId]?.P || topDatabase.DEFAULT.P,
+                topP_ist: "",
+                photo: null
+            });
+            renderApp();
+        }
+
+        function removeHazardItem(catId, itemId) {
+            if (appState.assessments[catId]) {
+                appState.assessments[catId].items = appState.assessments[catId].items.filter(i => i.id !== itemId);
+                if (appState.assessments[catId].items.length === 0) {
+                    appState.assessments[catId].present = false;
+                }
+                renderApp();
+            }
+        }
+
+        function loadDefaultTOP(catId, itemId) {
+            const item = appState.assessments[catId]?.items.find(i => i.id === itemId);
+            if (item) {
+                const defaults = topDatabase[catId] || topDatabase.DEFAULT;
+                item.topT_soll = defaults.T;
+                item.topO_soll = defaults.O;
+                item.topP_soll = defaults.P;
+                renderApp();
+            }
+        }
+
+        function handleItemPhoto(catId, itemId, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const item = appState.assessments[catId]?.items.find(i => i.id === itemId);
+                if (item) {
+                    item.photo = e.target.result;
+                    renderApp();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderStepSummary(body, footer) {
+            let totalHazards = 0, redCount = 0, yellowCount = 0, greenCount = 0;
+
+            bghmCategories.forEach(cat => {
+                const assessment = appState.assessments[cat.id];
+                if (assessment && assessment.present) {
+                    assessment.items.forEach(item => {
+                        totalHazards++;
+                        if (item.riskLevel === 'ROT') redCount++;
+                        else if (item.riskLevel === 'GELB') yellowCount++;
+                        else greenCount++;
+                    });
+                }
+            });
+
+            body.innerHTML = `
+                <div class="space-y-4">
+                    <div class="text-center">
+                        <div class="w-14 h-14 bg-amber-500 text-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-md font-bold">
+                            <i class="fa-solid fa-file-contract text-2xl"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-slate-800">Prüfprotokoll bereit</h2>
+                        <p class="text-xs text-slate-500">Zusammenfassung und digitale Unterzeichnung</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                        <h4 class="text-xs font-bold text-slate-700 uppercase">Risikobewertung auf der Baustelle</h4>
+                        
+                        ${redCount > 0 ? `
+                            <div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-2.5">
+                                <i class="fa-solid fa-octagon-exclamation text-red-600 text-lg mt-0.5"></i>
+                                <div>
+                                    <strong class="font-bold block text-red-900">🔴 ROT (${redCount}x Gefährdung): Sofortiger Handlungsbedarf!</strong>
+                                    <p class="mt-0.5 text-[11px]">Arbeiten an den Gefahrenstellen sofort einstellen und nach dem TOP-Prinzip umgehend die Maßnahmen umsetzen.</p>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${yellowCount > 0 ? `
+                            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-600 text-lg mt-0.5"></i>
+                                <div>
+                                    <strong class="font-bold block text-amber-950">🟡 GELB (${yellowCount}x Achtung): Gefahrenstelle umgehen / beheben!</strong>
+                                    <p class="mt-0.5 text-[11px]">Achtung geboten! Gefahrenstelle sichern, nach TOP-Prinzip anpassen und Maßnahmen im angegebenen Zeitraum durchführen.</p>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${(totalHazards === 0 || (redCount === 0 && yellowCount === 0)) ? `
+                            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2.5">
+                                <i class="fa-solid fa-circle-check text-emerald-600 text-lg mt-0.5"></i>
+                                <div>
+                                    <strong class="font-bold block text-emerald-900">🟢 GRÜN: Alles in Ordnung</strong>
+                                    <p class="mt-0.5 text-[11px]">Keine kritischen Mängel festgestellt. Der reguläre Baustellenbetrieb kann fortgesetzt werden.</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-bold text-slate-700 uppercase">Digitale Unterschrift des Prüfers</label>
+                            <button onclick="clearSignature()" class="text-[10px] text-red-500 font-bold hover:underline">
+                                <i class="fa-solid fa-eraser mr-1"></i> Löschen
+                            </button>
+                        </div>
+                        <div class="border border-slate-300 rounded-xl overflow-hidden bg-slate-50 relative">
+                            <canvas id="signature-canvas" class="w-full h-32 touch-none cursor-crosshair"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            footer.innerHTML = `
+                <button onclick="appState.currentStep = 3; renderApp();" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 px-4 rounded-xl text-xs">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Zurück
+                </button>
+                <button onclick="generatePDF()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3.5 px-6 rounded-xl text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all">
+                    <i class="fa-solid fa-file-pdf text-lg"></i>
+                    <span>PDF Herunterladen</span>
+                </button>
+            `;
+
+            setTimeout(initSignatureCanvas, 100);
+        }
+
+        let signaturePadCanvas = null, signatureCtx = null, isSigning = false;
+
+        function initSignatureCanvas() {
+            const canvas = document.getElementById('signature-canvas');
+            if (!canvas) return;
+
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+
+            signatureCtx = canvas.getContext('2d');
+            signatureCtx.strokeStyle = "#0F172A";
+            signatureCtx.lineWidth = 2.5;
+            signatureCtx.lineCap = "round";
+
+            const getPos = (e) => {
+                const cRect = canvas.getBoundingClientRect();
+                return {
+                    x: (e.touches ? e.touches[0].clientX : e.clientX) - cRect.left,
+                    y: (e.touches ? e.touches[0].clientY : e.clientY) - cRect.top
+                };
+            };
+
+            const startSign = (e) => {
+                isSigning = true;
+                const pos = getPos(e);
+                signatureCtx.beginPath();
+                signatureCtx.moveTo(pos.x, pos.y);
+            };
+
+            const moveSign = (e) => {
+                if (!isSigning) return;
+                const pos = getPos(e);
+                signatureCtx.lineTo(pos.x, pos.y);
+                signatureCtx.stroke();
+            };
+
+            const endSign = () => {
+                if (!isSigning) return;
+                isSigning = false;
+                appState.metadata.signature = canvas.toDataURL('image/png');
+            };
+
+            canvas.addEventListener('mousedown', startSign);
+            canvas.addEventListener('mousemove', moveSign);
+            window.addEventListener('mouseup', endSign);
+
+            canvas.addEventListener('touchstart', startSign);
+            canvas.addEventListener('touchmove', moveSign);
+            window.addEventListener('touchend', endSign);
+        }
+
+        function clearSignature() {
+            const canvas = document.getElementById('signature-canvas');
+            if (canvas && signatureCtx) {
+                signatureCtx.clearRect(0, 0, canvas.width, canvas.height);
+                appState.metadata.signature = null;
+            }
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+            const pageHeight = 297;
+            const pageWidth = 210;
+            const margin = 15;
+            let currentY = 15;
+
+            const checkPageBreak = (neededHeight) => {
+                if (currentY + neededHeight > pageHeight - 20) {
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text("Copyright Arbeitsschutz Wolf", margin, pageHeight - 10);
+                    doc.addPage();
+                    currentY = 15;
+                }
+            };
+
+            const headerHeight = 24;
+            doc.setFillColor(30, 41, 59);
+            doc.rect(0, 0, pageWidth, headerHeight, 'F');
+
+            doc.setFillColor(245, 158, 11);
+            doc.rect(0, headerHeight - 1.5, pageWidth, 1.5, 'F');
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.setTextColor(255, 255, 255);
+            doc.text("GEFÄHRDUNGSBEURTEILUNG BAUSTELLE", margin, 11);
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(245, 158, 11);
+            doc.text(appState.metadata.companyName || "Arbeitsschutz Wolf", margin, 17);
+
+            if (appState.metadata.logo && appState.metadata.logoDimensions) {
+                try {
+                    const maxLogoW = 35;
+                    const maxLogoH = 16;
+                    let logoW = maxLogoW;
+                    let logoH = (appState.metadata.logoDimensions.height / appState.metadata.logoDimensions.width) * logoW;
+
+                    if (logoH > maxLogoH) {
+                        logoH = maxLogoH;
+                        logoW = (appState.metadata.logoDimensions.width / appState.metadata.logoDimensions.height) * logoH;
+                    }
+                    doc.addImage(appState.metadata.logo, 'JPEG', pageWidth - margin - logoW, 4, logoW, logoH);
+                } catch(e) {}
+            }
+
+            currentY = headerHeight + 8;
+
+            doc.setFillColor(248, 250, 252);
+            doc.rect(margin, currentY, pageWidth - (margin * 2), 22, 'F');
+            doc.setFontSize(9);
+            doc.setTextColor(51, 65, 85);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Baustelle / Objekt:", margin + 4, currentY + 6);
+            doc.text("Prüfer / Verantwortlicher:", margin + 4, currentY + 12);
+            doc.text("Datum:", margin + 4, currentY + 18);
+
+            doc.setFont("helvetica", "normal");
+            doc.text(appState.metadata.siteName || "-", margin + 45, currentY + 6);
+            doc.text(appState.metadata.inspector || "-", margin + 45, currentY + 12);
+            doc.text(appState.metadata.date || "-", margin + 45, currentY + 18);
+
+            currentY += 28;
+
+            const photosToAppend = [];
+
+            bghmCategories.forEach(cat => {
+                const assessment = appState.assessments[cat.id];
+                const hasHazards = assessment && assessment.present && assessment.items.length > 0;
+
+                checkPageBreak(25);
+
+                doc.setFillColor(241, 245, 249);
+                doc.rect(margin, currentY, pageWidth - (margin * 2), 7, 'F');
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(30, 41, 59);
+                doc.text(cat.title, margin + 3, currentY + 5);
+                currentY += 10;
+
+                if (!hasHazards) {
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8.5);
+                    doc.setTextColor(22, 163, 74);
+                    doc.text("GRÜN (OK) - Keine Gefährdung auf der Baustelle festgestellt.", margin + 3, currentY);
+                    currentY += 8;
+                } else {
+                    assessment.items.forEach((item, idx) => {
+                        checkPageBreak(35);
+
+                        if (item.photo) {
+                            photosToAppend.push({
+                                categoryTitle: cat.title,
+                                itemIndex: idx + 1,
+                                description: item.description || "Mangel ohne Text",
+                                photoData: item.photo
+                            });
+                        }
+
+                        const leftColW = 115;
+                        const rightColX = margin + leftColW + 5;
+
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(9);
+                        doc.setTextColor(217, 119, 6);
+                        doc.text(`Mangel #${idx + 1}: ${item.description || "Unbenannter Mangel"}`, margin + 3, currentY);
+
+                        doc.setFontSize(8);
+                        doc.setFont("helvetica", "bold");
+                        if (item.riskLevel === 'ROT') doc.setTextColor(220, 38, 38);
+                        else if (item.riskLevel === 'GELB') doc.setTextColor(217, 119, 6);
+                        else doc.setTextColor(22, 163, 74);
+
+                        doc.text(`Status: ${item.riskLevel || 'GELB'}`, rightColX, currentY);
+
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(71, 85, 105);
+                        doc.text(`Verantwortlich: ${item.responsible || 'Nicht zugewiesen'}`, rightColX, currentY + 4);
+                        doc.text(`Frist: ${item.priority || 'MITTEL'}`, rightColX, currentY + 8);
+
+                        currentY += 5;
+
+                        doc.setFontSize(8);
+                        doc.setTextColor(30, 41, 59);
+
+                        const topData = [
+                            { label: "T (Soll):", val: item.topT_soll, ist: item.topT_ist },
+                            { label: "O (Soll):", val: item.topO_soll, ist: item.topO_ist },
+                            { label: "P (Soll):", val: item.topP_soll, ist: item.topP_ist }
+                        ];
+
+                        topData.forEach(top => {
+                            if (top.val) {
+                                const lines = doc.splitTextToSize(`${top.label} ${top.val}`, leftColW - 5);
+                                doc.text(lines, margin + 5, currentY);
+                                currentY += (lines.length * 4);
+                            }
+                            if (top.ist) {
+                                const linesIst = doc.splitTextToSize(`(Ist): ${top.ist}`, leftColW - 5);
+                                doc.setTextColor(100, 116, 139);
+                                doc.text(linesIst, margin + 8, currentY);
+                                doc.setTextColor(30, 41, 59);
+                                currentY += (linesIst.length * 4);
+                            }
+                        });
+
+                        currentY += 4;
+                    });
+                }
+            });
+
+            checkPageBreak(35);
+            currentY += 10;
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(30, 41, 59);
+            doc.text("Unterschrift Prüfer:", margin, currentY);
+
+            if (appState.metadata.signature) {
+                try {
+                    doc.addImage(appState.metadata.signature, 'PNG', margin, currentY + 2, 50, 20);
+                } catch(e) {}
+            }
+
+            doc.text(`Datum: ${appState.metadata.date}`, margin + 110, currentY);
+
+            if (photosToAppend.length > 0) {
+                doc.addPage();
+                currentY = 15;
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(30, 41, 59);
+                doc.text("ANHANG: FOTODOKUMENTATION DER GEFÄHRDUNGEN", margin, currentY);
+                currentY += 12;
+
+                photosToAppend.forEach((photoObj) => {
+                    checkPageBreak(75);
+
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(217, 119, 6);
+                    doc.text(`${photoObj.categoryTitle} - Mangel #${photoObj.itemIndex}`, margin, currentY);
+
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(51, 65, 85);
+                    doc.text(`Befund: ${photoObj.description}`, margin, currentY + 5);
+
+                    try {
+                        doc.addImage(photoObj.photoData, 'JPEG', margin, currentY + 9, 80, 55);
+                    } catch (e) {
+                        try {
+                            doc.addImage(photoObj.photoData, 'PNG', margin, currentY + 9, 80, 55);
+                        } catch(err) {}
+                    }
+
+                    currentY += 70;
+                });
+            }
+
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(148, 163, 184);
+                doc.text("Copyright Arbeitsschutz Wolf", margin, pageHeight - 10);
+            }
+
+            doc.save(`Gefahrungsbeurteilung_${appState.metadata.siteName.replace(/\s+/g, '_') || 'Baustelle'}.pdf`);
+        }
+    </script>
+</body>
+</html>
